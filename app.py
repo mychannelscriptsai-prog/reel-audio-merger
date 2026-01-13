@@ -101,37 +101,24 @@ def _upload_to_cloudinary(mp4_path: Path) -> str:
 @app.post("/merge")
 def merge(req: MergeRequest):
     try:
-        main_dur = max(1, min(int(req.main_duration_sec), 50))
-        cta_dur = max(1, min(int(req.cta_duration_sec), 10))
+        duration = max(1, min(int(req.duration_sec), 58))
         volume = max(0.0, min(float(req.music_volume), 1.0))
 
         with tempfile.TemporaryDirectory() as td:
             td = Path(td)
-
-            main_video = td / "main.mp4"
-            cta_video = td / "cta.mp4"
+            video_in = td / "in.mp4"
             audio_in = td / "music.mp3"
             out_mp4 = td / "out.mp4"
 
-            _download(str(req.main_video_url), main_video)
-            _download(str(req.cta_video_url), cta_video)
-            _download(str(req.audio_url), audio_in)
-
-            _run_ffmpeg_two_videos(
-                main_video,
-                cta_video,
-                audio_in,
-                out_mp4,
-                main_dur,
-                cta_dur,
-                volume
-            )
-
+            _download(req.video_url, video_in)
+            _download(req.audio_url, audio_in)
+            _run_ffmpeg(video_in, audio_in, out_mp4, duration, volume)
             final_url = _upload_to_cloudinary(out_mp4)
 
         return {"final_url": final_url}
 
     except requests.HTTPError as e:
         raise HTTPException(status_code=400, detail=f"HTTP error: {e}")
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
