@@ -49,9 +49,9 @@ def _run_ffmpeg_two_videos(
     Merge main video + CTA video with fade transition and background audio.
     Memory-efficient version suitable for low-RAM instances.
     """
-    fade_duration = 1.1
+    fade_duration = 0.7
     total_duration = main_dur + cta_dur
-    fade_offset = max(0.7, main_dur - fade_duration)
+    fade_offset = max(0.0, main_dur - fade_duration)
 
     cmd = [
         "ffmpeg",
