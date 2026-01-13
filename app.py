@@ -45,37 +45,45 @@ def _run_ffmpeg_two_videos(
     cta_dur: int,
     volume: float
 ) -> None:
+    """
+    Merge main video + CTA video with fade transition and background audio.
+    Memory-efficient version suitable for low-RAM instances.
+    """
     fade_duration = 0.7
+    total_duration = main_dur + cta_dur
     fade_offset = max(0.0, main_dur - fade_duration)
 
-    # Add loop for CTA
-cmd = [
-    "ffmpeg",
-    "-y",
-    "-i", str(main_video),
-    "-stream_loop -1", "-i", str(cta_video),  # infinite loop
-    "-stream_loop -1", "-i", str(audio_in),
-    "-filter_complex",
-    f"[0:v]scale=1080:1920,fps=30,format=yuv420p[v0];"
-    f"[1:v]scale=1080:1920,fps=30,format=yuv420p[v1];"
-    f"[v0][v1]xfade=transition=fade:duration={fade_duration}:offset={fade_offset}[v];"
-    f"[2:a]volume={volume}[a]",
-    "-map", "[v]",
-    "-map", "[a]",
-    "-t", str(main_dur + cta_dur),
-    "-c:v", "libx264",
-    "-preset", "ultrafast",
-    "-crf", "28",
-    "-pix_fmt", "yuv420p",
-    "-c:a", "aac",
-    "-b:a", "128k",
-    "-shortest",
-    str(out_mp4),
-]
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i", str(main_video),
+        "-stream_loop", "-1", "-i", str(cta_video),   # loop CTA in case it's shorter
+        "-stream_loop", "-1", "-i", str(audio_in),
+        "-filter_complex",
+        # Video filters: scale, fps, format
+        f"[0:v]scale=1080:1920:flags=bicubic,fps=30,format=yuv420p[v0];"
+        f"[1:v]scale=1080:1920:flags=bicubic,fps=30,format=yuv420p[v1];"
+        # Crossfade transition
+        f"[v0][v1]xfade=transition=fade:duration={fade_duration}:offset={fade_offset}[v];"
+        # Audio filter
+        f"[2:a]volume={volume}[a]",
+        "-map", "[v]",
+        "-map", "[a]",
+        "-t", str(total_duration),              # total output duration
+        "-c:v", "libx264",
+        "-preset", "ultrafast",                # memory-efficient
+        "-crf", "28",                           # slightly lower quality for low RAM
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac",
+        "-b:a", "128k",
+        "-shortest",
+        str(out_mp4),
+    ]
 
+    # Run ffmpeg
     p = subprocess.run(cmd, capture_output=True, text=True)
     if p.returncode != 0:
-        raise RuntimeError(f"ffmpeg failed: {p.stderr[-2000:]}")
+        raise RuntimeError(f"FFmpeg failed:\n{p.stderr[-2000:]}")
 
 
 def _upload_to_cloudinary(mp4_path: Path) -> str:
