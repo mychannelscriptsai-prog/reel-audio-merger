@@ -18,12 +18,13 @@ if not CLOUD_NAME or not UPLOAD_PRESET:
 
 app = FastAPI()
 
-
 class MergeRequest(BaseModel):
-    video_url: HttpUrl
+    main_video_url: HttpUrl
+    cta_video_url: HttpUrl
     audio_url: HttpUrl
-    duration_sec: int = 7
-    music_volume: float = 0.15  # 0.0 - 1.0
+    main_duration_sec: int = 7
+    cta_duration_sec: int = 3
+    music_volume: float = 0.15
 
 
 def _download(url: str, out_path: Path) -> None:
@@ -35,26 +36,41 @@ def _download(url: str, out_path: Path) -> None:
                     f.write(chunk)
 
 
-def _run_ffmpeg(video_in: Path, audio_in: Path, out_mp4: Path, duration: int, volume: float) -> None:
-    # -stream_loop -1 loops audio if it's shorter than duration
-    # -t trims output length
-    # -shortest ensures we never exceed the shortest stream
+def _run_ffmpeg_two_videos(
+    main_video: Path,
+    cta_video: Path,
+    audio_in: Path,
+    out_mp4: Path,
+    main_dur: int,
+    cta_dur: int,
+    volume: float
+) -> None:
+    fade_duration = 0.7
+    fade_offset = max(0.0, main_dur - fade_duration)
+
     cmd = [
-        "ffmpeg",
-        "-y",
-        "-i", str(video_in),
+        "ffmpeg", "-y",
+        "-i", str(main_video),
+        "-i", str(cta_video),
         "-stream_loop", "-1",
         "-i", str(audio_in),
-        "-t", str(duration),
-        "-filter_complex", f"[1:a]volume={volume}[a]",
-        "-map", "0:v:0",
+        "-filter_complex",
+        f"[0:v]scale=1080:1920,fps=30,format=yuv420p[v0];"
+        f"[1:v]scale=1080:1920,fps=30,format=yuv420p[v1];"
+        f"[v0][v1]xfade=transition=fade:duration={fade_duration}:offset={fade_offset}[v];"
+        f"[2:a]volume={volume}[a]",
+        "-map", "[v]",
         "-map", "[a]",
-        "-c:v", "copy",
+        "-t", str(main_dur + cta_dur),
+        "-c:v", "libx264",
+        "-preset", "veryfast",
+        "-pix_fmt", "yuv420p",
         "-c:a", "aac",
         "-b:a", "128k",
         "-shortest",
         str(out_mp4),
     ]
+
     p = subprocess.run(cmd, capture_output=True, text=True)
     if p.returncode != 0:
         raise RuntimeError(f"ffmpeg failed: {p.stderr[-2000:]}")
@@ -85,21 +101,37 @@ def _upload_to_cloudinary(mp4_path: Path) -> str:
 @app.post("/merge")
 def merge(req: MergeRequest):
     try:
-        duration = max(1, min(int(req.duration_sec), 58))  # keep Shorts/Reels safe
+        main_dur = max(1, min(int(req.main_duration_sec), 50))
+        cta_dur = max(1, min(int(req.cta_duration_sec), 10))
         volume = max(0.0, min(float(req.music_volume), 1.0))
+
         with tempfile.TemporaryDirectory() as td:
             td = Path(td)
-            video_in = td / "in.mp4"
+
+            main_video = td / "main.mp4"
+            cta_video = td / "cta.mp4"
             audio_in = td / "music.mp3"
             out_mp4 = td / "out.mp4"
 
-            _download(str(req.video_url), video_in)
+            _download(str(req.main_video_url), main_video)
+            _download(str(req.cta_video_url), cta_video)
             _download(str(req.audio_url), audio_in)
-            _run_ffmpeg(video_in, audio_in, out_mp4, duration, volume)
+
+            _run_ffmpeg_two_videos(
+                main_video,
+                cta_video,
+                audio_in,
+                out_mp4,
+                main_dur,
+                cta_dur,
+                volume
+            )
+
             final_url = _upload_to_cloudinary(out_mp4)
 
         return {"final_url": final_url}
+
     except requests.HTTPError as e:
         raise HTTPException(status_code=400, detail=f"HTTP error: {e}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)))
