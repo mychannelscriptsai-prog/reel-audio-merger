@@ -6,7 +6,7 @@ from pathlib import Path
 
 import requests
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel,
+from pydantic import BaseModel
 
 CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME")
 UPLOAD_PRESET = os.environ.get("CLOUDINARY_UPLOAD_PRESET")  # unsigned preset name
