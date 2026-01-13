@@ -101,7 +101,6 @@ def _upload_to_cloudinary(mp4_path: Path) -> str:
 @app.post("/merge")
 def merge(req: MergeRequest):
     try:
-        # Use main_duration_sec and cta_duration_sec
         main_duration = max(1, min(int(req.main_duration_sec), 58))
         cta_duration = max(1, min(int(req.cta_duration_sec), 58))
         volume = max(0.0, min(float(req.music_volume), 1.0))
@@ -118,7 +117,7 @@ def merge(req: MergeRequest):
             _download(req.cta_video_url, cta_video)
             _download(req.audio_url, audio_in)
 
-            # Merge the two videos
+            # Merge two videos
             _run_ffmpeg_two_videos(
                 main_video=main_video,
                 cta_video=cta_video,
@@ -129,12 +128,10 @@ def merge(req: MergeRequest):
                 volume=volume
             )
 
+            # Upload final video
             final_url = _upload_to_cloudinary(out_mp4)
 
         return {"final_url": final_url}
 
-    except requests.HTTPError as e:
-        raise HTTPException(status_code=400, detail=f"HTTP error: {e}")
-
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Merge failed: {str(e)}")
