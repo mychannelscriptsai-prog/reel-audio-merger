@@ -134,4 +134,4 @@ def merge(req: MergeRequest):
     except requests.HTTPError as e:
         raise HTTPException(status_code=400, detail=f"HTTP error: {e}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)))
+        raise HTTPException(status_code=500, detail=str(e))
