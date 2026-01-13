@@ -48,32 +48,30 @@ def _run_ffmpeg_two_videos(
     fade_duration = 0.7
     fade_offset = max(0.0, main_dur - fade_duration)
 
-    cmd = [
-        "ffmpeg",
-        "-y",
-        "-i", str(main_video),
-        "-i", str(cta_video),
-        "-stream_loop", "-1",
-        "-i", str(audio_in),
-        "-filter_complex",
-        # Use minimal memory filters
-        f"[0:v]scale=1080:1920:flags=bicubic,fps=30,format=yuv420p[v0];"
-        f"[1:v]scale=1080:1920:flags=bicubic,fps=30,format=yuv420p[v1];"
-        f"[v0][v1]xfade=transition=fade:duration={fade_duration}:offset={fade_offset}[v];"
-        f"[2:a]volume={volume}[a]",
-        "-map", "[v]",
-        "-map", "[a]",
-        "-t", str(main_dur + cta_dur),
-        # Memory-efficient video encoding
-        "-c:v", "libx264",
-        "-preset", "ultrafast",       # was veryfast, now ultrafast
-        "-crf", "28",                 # lower quality but less memory
-        "-pix_fmt", "yuv420p",
-        "-c:a", "aac",
-        "-b:a", "128k",
-        "-shortest",
-        str(out_mp4),
-    ]
+    # Add loop for CTA
+cmd = [
+    "ffmpeg",
+    "-y",
+    "-i", str(main_video),
+    "-stream_loop -1", "-i", str(cta_video),  # infinite loop
+    "-stream_loop -1", "-i", str(audio_in),
+    "-filter_complex",
+    f"[0:v]scale=1080:1920,fps=30,format=yuv420p[v0];"
+    f"[1:v]scale=1080:1920,fps=30,format=yuv420p[v1];"
+    f"[v0][v1]xfade=transition=fade:duration={fade_duration}:offset={fade_offset}[v];"
+    f"[2:a]volume={volume}[a]",
+    "-map", "[v]",
+    "-map", "[a]",
+    "-t", str(main_dur + cta_dur),
+    "-c:v", "libx264",
+    "-preset", "ultrafast",
+    "-crf", "28",
+    "-pix_fmt", "yuv420p",
+    "-c:a", "aac",
+    "-b:a", "128k",
+    "-shortest",
+    str(out_mp4),
+]
 
     p = subprocess.run(cmd, capture_output=True, text=True)
     if p.returncode != 0:
