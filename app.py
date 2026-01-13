@@ -101,6 +101,11 @@ def _upload_to_cloudinary(mp4_path: Path) -> str:
 @app.post("/merge")
 def merge(req: MergeRequest):
     try:
+        # Log the URLs to debug
+        print(f"Downloading main video from: {req.main_video_url}")
+        print(f"Downloading CTA video from: {req.cta_video_url}")
+        print(f"Downloading audio from: {req.audio_url}")
+
         main_duration = max(1, min(int(req.main_duration_sec), 58))
         cta_duration = max(1, min(int(req.cta_duration_sec), 58))
         volume = max(0.0, min(float(req.music_volume), 1.0))
@@ -112,10 +117,12 @@ def merge(req: MergeRequest):
             audio_in = td / "music.mp3"
             out_mp4 = td / "out.mp4"
 
+            # Download the files
             _download(req.main_video_url, main_video)
             _download(req.cta_video_url, cta_video)
             _download(req.audio_url, audio_in)
 
+            # Merge videos
             _run_ffmpeg_two_videos(
                 main_video=main_video,
                 cta_video=cta_video,
@@ -131,5 +138,5 @@ def merge(req: MergeRequest):
         return {"final_url": final_url}
 
     except Exception as e:
-        print(f"Merge failed: {e}")  # ✅ logs the actual error to Render
+        print(f"Merge failed: {e}")  # Log any errors
         raise HTTPException(status_code=500, detail=f"Merge failed: {str(e)}")
