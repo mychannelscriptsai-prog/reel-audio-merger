@@ -49,7 +49,7 @@ def _run_ffmpeg_two_videos(
     Merge main video + CTA video with fade transition and background audio.
     Memory-efficient version suitable for low-RAM instances.
     """
-    fade_duration = 0.7
+    fade_duration = 1.0
     total_duration = main_dur + cta_dur
     fade_offset = max(0.0, main_dur - fade_duration)
 
@@ -61,8 +61,8 @@ def _run_ffmpeg_two_videos(
         "-stream_loop", "-1", "-i", str(audio_in),
         "-filter_complex",
         # Video filters: scale, fps, format
-        f"[0:v]scale=1080:1920:flags=bicubic,fps=30,format=yuv420p[v0];"
-        f"[1:v]scale=1080:1920:flags=bicubic,fps=30,format=yuv420p[v1];"
+        "[0:v]scale=720:1280:flags=bicubic,fps=30,format=yuv420p[v0];"
+        "[1:v]scale=720:1280:flags=bicubic,fps=30,format=yuv420p[v1];"
         # Crossfade transition
         f"[v0][v1]xfade=transition=fade:duration={fade_duration}:offset={fade_offset}[v];"
         # Audio filter
