@@ -56,7 +56,7 @@ def _run_ffmpeg_two_videos(
     cmd = [
         "ffmpeg",
         "-y",
-        "-i", str(main_video),
+        "-stream_loop", "-1", "-i", str(main_video),
         "-stream_loop", "-1", "-i", str(cta_video),   # loop CTA in case it's shorter
         "-stream_loop", "-1", "-i", str(audio_in),
         "-filter_complex",
